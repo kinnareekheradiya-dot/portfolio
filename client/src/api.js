@@ -1,0 +1,1 @@
+export const API='http://localhost:5000/api';export async function api(path,opts={}){const token=localStorage.getItem('nc_token');const r=await fetch(API+path,{...opts,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})}});const d=await r.json();if(!r.ok)throw Error(d.message||'Request failed');return d}

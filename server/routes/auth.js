@@ -1,0 +1,11 @@
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import {pool} from '../config/db.js';
+import {auth} from '../middleware/auth.js';
+const router=express.Router();
+const tokenFor=u=>jwt.sign({id:u.id,name:u.name,email:u.email,role:u.role},process.env.JWT_SECRET,{expiresIn:'7d'});
+router.post('/register',async(req,res)=>{try{const{name,email,password}=req.body;if(!name||!email||!password||password.length<6)return res.status(400).json({message:'Name, email and a 6+ character password are required'});const [exists]=await pool.query('SELECT id FROM users WHERE email=?',[email.toLowerCase()]);if(exists.length)return res.status(409).json({message:'Email is already registered'});const hash=await bcrypt.hash(password,10);const [r]=await pool.query('INSERT INTO users(name,email,password) VALUES(?,?,?)',[name,email.toLowerCase(),hash]);const u={id:r.insertId,name,email:email.toLowerCase(),role:'user'};res.status(201).json({token:tokenFor(u),user:u});}catch(e){res.status(500).json({message:'Registration failed'})}});
+router.post('/login',async(req,res)=>{try{const{email,password}=req.body;const [rows]=await pool.query('SELECT * FROM users WHERE email=?',[email?.toLowerCase()]);if(!rows.length||!(await bcrypt.compare(password||'',rows[0].password)))return res.status(401).json({message:'Invalid email or password'});const u=rows[0];res.json({token:tokenFor(u),user:{id:u.id,name:u.name,email:u.email,role:u.role}})}catch(e){res.status(500).json({message:'Login failed'})}});
+router.get('/me',auth,async(req,res)=>{const [rows]=await pool.query('SELECT id,name,email,role,created_at FROM users WHERE id=?',[req.user.id]);res.json(rows[0]);});
+export default router;

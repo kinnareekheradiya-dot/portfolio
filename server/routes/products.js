@@ -1,0 +1,10 @@
+import express from 'express';
+import {pool} from '../config/db.js';
+import {auth,admin} from '../middleware/auth.js';
+const router=express.Router();
+router.get('/',async(req,res)=>{const{search='',category='',sort='latest'}=req.query;let sql='SELECT * FROM products WHERE 1=1',p=[];if(search){sql+=' AND (name LIKE ? OR description LIKE ?)';p.push(`%${search}%`,`%${search}%`)}if(category){sql+=' AND category=?';p.push(category)}sql+=sort==='price-low'?' ORDER BY price ASC':sort==='price-high'?' ORDER BY price DESC':sort==='rating'?' ORDER BY rating DESC':' ORDER BY created_at DESC';const[rows]=await pool.query(sql,p);res.json(rows)});
+router.get('/:id',async(req,res)=>{const[r]=await pool.query('SELECT * FROM products WHERE id=?',[req.params.id]);if(!r.length)return res.status(404).json({message:'Product not found'});res.json(r[0])});
+router.post('/',auth,admin,async(req,res)=>{const{name,description,price,category,image,badge,rating=4.5,stock=10}=req.body;const[r]=await pool.query('INSERT INTO products(name,description,price,category,image,badge,rating,stock) VALUES(?,?,?,?,?,?,?,?)',[name,description,price,category,image,badge,rating,stock]);res.status(201).json({id:r.insertId})});
+router.put('/:id',auth,admin,async(req,res)=>{const{name,description,price,category,image,badge,rating,stock}=req.body;await pool.query('UPDATE products SET name=?,description=?,price=?,category=?,image=?,badge=?,rating=?,stock=? WHERE id=?',[name,description,price,category,image,badge,rating,stock,req.params.id]);res.json({message:'Product updated'})});
+router.delete('/:id',auth,admin,async(req,res)=>{await pool.query('DELETE FROM products WHERE id=?',[req.params.id]);res.json({message:'Product deleted'})});
+export default router;
